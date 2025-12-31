@@ -59,4 +59,3 @@ To ensure the application is functional and "plug-and-play" for evaluation:
 4. **Action:** Click **Encrypt** (adds `.enc` extension) or **Decrypt** (removes `.enc` and restores original extension).
 
 ---
-*Developed with focus on Security, Code Readability, and User Experience for the Softlock interview.*
