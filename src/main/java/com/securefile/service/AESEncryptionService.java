@@ -21,13 +21,12 @@ public class AESEncryptionService implements EncryptionService {
     }
 
     @Override
-    public void encrypt(File file, String outputDist){
-        // 1. Create (IV) for CBC mode
+    public void encrypt(File file, String outputDist) {
+        // Create (IV) for CBC mode
         byte[] iv = new byte[16];
         new SecureRandom().nextBytes(iv);
         IvParameterSpec ivSpec = new IvParameterSpec(iv);
-
-        // 2. Initiate Cipher with Bouncy Castle("BC")
+        // Initiate Cipher with Bouncy Castle("BC")
         try {
             Cipher cipher = Cipher.getInstance(transformation, provider);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec);
@@ -36,21 +35,20 @@ public class AESEncryptionService implements EncryptionService {
                  FileOutputStream fos = new FileOutputStream(outputDist);
                  CipherOutputStream cos = new CipherOutputStream(fos, cipher)
             ) {
-                // 3.Write IV at the beginning of the file
+                // Write IV at the beginning of the file
                 fos.write(iv);
                 fis.transferTo(cos);
             }
-        }catch (Exception e) {
+        } catch (Exception e) {
             throw new RuntimeException("Encryption failed: " + e.getMessage(), e);
         }
     }
 
-
     @Override
-    public void decrypt(File file, String outputDist){
+    public void decrypt(File file, String outputDist) {
         try (FileInputStream fis = new FileInputStream(file)) {
 
-            // 1. Read the IV
+            // Read the IV
             byte[] iv = new byte[16];
             int ivBytes = fis.read(iv);
             if (ivBytes < 16) {
@@ -58,8 +56,8 @@ public class AESEncryptionService implements EncryptionService {
             }
             IvParameterSpec ivSpec = new IvParameterSpec(iv);
 
-            // 2. Initialize Cipher for Decryption
-            Cipher cipher =  Cipher.getInstance(transformation, provider);
+            // Initialize Cipher for Decryption
+            Cipher cipher = Cipher.getInstance(transformation, provider);
             cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec);
 
             try (CipherInputStream cis = new CipherInputStream(fis, cipher);
@@ -67,9 +65,8 @@ public class AESEncryptionService implements EncryptionService {
 
                 cis.transferTo(fos);
             }
-        }catch (Exception e) {
+        } catch (Exception e) {
             throw new RuntimeException("Decryption failed: " + e.getMessage(), e);
         }
     }
-
 }
