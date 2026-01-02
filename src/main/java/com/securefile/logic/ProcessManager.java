@@ -1,92 +1,90 @@
 package com.securefile.logic;
 
-import com.securefile.service.AppService;
-import com.securefile.service.AESEncryptionService;
+import com.securefile.service.EncryptionService;
 
 import java.io.File;
-import java.nio.file.InvalidPathException;
-import java.nio.file.Paths;
+
+
 
 public class ProcessManager {
-    private final AppService appService = new AppService(new AESEncryptionService());
-    private String baseDestFolder;
-    private String baseFileName;
+    private final EncryptionService encryptionService;
+    private final String ENCRYPTION_EXTENTION = ".enc";
+    private String destFolder;
+    private String fileName;
     private File srcFile;
 
-
-    public void setSrcFile(File srcFile) {
-        validateFile(srcFile);
-        this.srcFile = srcFile;
-        appService.setInputFile(srcFile);
-    }
-
-    public void setDestFolder(String destFolder, String fileName) {
-        validateName(fileName);
-        baseDestFolder = destFolder;
-        baseFileName = fileName;
+    public ProcessManager(EncryptionService encryptionService) {
+        this.encryptionService = encryptionService;
     }
 
     public void executeEncryption() {
-        String extension = getFileExtension(srcFile);
-
-        // Final Path
-        String finalPath = baseDestFolder + File.separator + baseFileName + extension + ".enc";
-        appService.setOutputPath(finalPath);
-        appService.encryptFile();
+        validateAllDataExist();
+        String finalPath = destFolder + File.separator + fileName + getFileExtension() + ENCRYPTION_EXTENTION;
+        encryptionService.encrypt(srcFile, finalPath);
+        reset();
     }
 
     public void executeDecryption() {
-        String srcName = srcFile.getName();
-
-        String finalFileName = baseFileName;
-
-        if (srcName.toLowerCase().endsWith(".enc")) {
-            // Remove .enc from encrypted file name
-            String strippedSrc = srcName.substring(0, srcName.length() - 4);
-            finalFileName = finalFileName + getFileExtension(strippedSrc);
-        }
-
-        String finalPath = baseDestFolder + File.separator + finalFileName;
-        appService.setOutputPath(finalPath);
-        appService.decryptFile();
+        validateAllDataExist();
+        String finalFileName = fileName + getOriginalFileExtension();
+        String finalPath = destFolder + File.separator + finalFileName;
+        encryptionService.decrypt(srcFile, finalPath);
+        reset();
     }
 
-    private void validateName(String name) {
-        if (name.isBlank()) {
-            throw new IllegalArgumentException("Name can not be blank.");
+    public String getFileSize() {
+        if (srcFile.length() < 1024) {
+            return srcFile.length() + " Bytes";
         }
-        // Check if file name is valid for the OS
-        try {
-            Paths.get(name);
-        } catch (InvalidPathException e) {
-            throw new IllegalArgumentException("The output file name contains invalid characters.");
-        }
-
+        return (srcFile.length() / 1024) + " KB";
     }
 
-    private void validateFile(File file) {
-        if (!file.exists()) {
-            throw new IllegalArgumentException("File no longer exists.");
+    public String suggestFileName() {
+        String srcfileName = srcFile.getName();
+        // name without extension
+        int dotIndex = srcfileName.indexOf('.');
+        if (dotIndex > 0) {
+            return srcfileName.substring(0, dotIndex);
         }
+        return srcfileName;
     }
 
-    public String getFileSize(File file) {
-        if (file.length() < 1024) {
-            return file.length() + " Bytes";
-        }
-        return (file.length() / 1024) + " KB";
+    public String getFileExtension() {
+        return FileUtils.getFileExtension(srcFile.getName());
     }
 
-    public String getFileExtension(File file) {
-        return getFileExtension(file.getName());
+
+    public void validateAllDataExist() {
+        FileUtils.validateFile(srcFile);
+        FileUtils.validateFolder(destFolder);
+        FileUtils.validateName(fileName);
     }
 
-    private String getFileExtension(String fileName) {
-        String extension = "";
-        int i = fileName.lastIndexOf('.');
-        if (i > 0) {
-            extension = fileName.substring(i);
-        }
-        return extension;
+
+    private String getOriginalFileExtension() {
+        int indexOfEncExt = srcFile.getName().lastIndexOf(ENCRYPTION_EXTENTION);
+        String cleanSrcName = srcFile.getName().substring(0,indexOfEncExt);
+        return FileUtils.getFileExtension(cleanSrcName);
+    }
+
+    private void reset() {
+        destFolder = null;
+        fileName = null;
+        srcFile = null;
+    }
+
+    public void setSrcFile(File srcFile) {
+        FileUtils.validateFile(srcFile);
+        this.srcFile = srcFile;
+    }
+
+    public void setDestFolder(String destFolder) {
+        FileUtils.validateFolder(destFolder);
+        this.destFolder = destFolder;
+    }
+
+    public void setFileName(String fileName) {
+        FileUtils.validateName(fileName);
+        this.fileName = fileName;
     }
 }

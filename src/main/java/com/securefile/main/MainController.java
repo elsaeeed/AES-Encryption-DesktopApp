@@ -1,6 +1,7 @@
 package com.securefile.main;
 
 import com.securefile.logic.ProcessManager;
+import com.securefile.service.AESEncryptionService;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
@@ -15,12 +16,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainController {
-    private final ProcessManager processManager = new ProcessManager();
+    private final ProcessManager processManager = new ProcessManager(new AESEncryptionService());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     @FXML private Label sourcePathLabel;
-    @FXML private Label fileSizeLabel; // New
-    @FXML private Label fileExtLabel;  // New
+    @FXML private Label fileSizeLabel;
+    @FXML private Label fileExtLabel;
     @FXML private Label destPathLabel;
     @FXML private TextField fileNameField;
     @FXML private Button encryptBtn;
@@ -30,9 +31,7 @@ public class MainController {
 
     @FXML
     public void initialize() {
-
-        disableEncryptionAndDecryption();
-        saveBtn.setDisable(true);
+        updateActionButtons(false, false, false);
     }
 
     @FXML
@@ -40,32 +39,17 @@ public class MainController {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Select File");
         File file = chooser.showOpenDialog(null);
-
-        // enforce user to use save button
-        disableEncryptionAndDecryption();
-
         if (file != null) {
             sourcePathLabel.setText(file.getAbsolutePath());
-            // Auto-suggest file name
-            String name = file.getName();
-            int dotIndex = name.indexOf('.');
-            if (dotIndex > 0) {
-                fileNameField.setText(name.substring(0, dotIndex));
-            } else {
-                fileNameField.setText(name);
-            }
-
-            // Calculate and show details
-            String sizeInKB = processManager.getFileSize(file)   ;
-            String extension = processManager.getFileExtension(file);
-
-            // Update the new UI labels
-            fileSizeLabel.setText("File Size: " + sizeInKB );
-            fileExtLabel.setText("Extension: " + extension.toUpperCase());
-
             processManager.setSrcFile(file);
+            // Auto-suggest file name
+            fileNameField.setText(processManager.suggestFileName());
+            // Calculate and show details
+            fileExtLabel.setText(UIConstants.DEFAULT_TEXT_LABEL + processManager.getFileExtension());
+            fileSizeLabel.setText(UIConstants.DEFAULT_SIZE_LABEL + processManager.getFileSize());
+            // enforce user to use the save button
+            updateActionButtons(false, false, true);
         }
-
     }
 
     @FXML
@@ -73,34 +57,29 @@ public class MainController {
         DirectoryChooser chooser = new DirectoryChooser();
         chooser.setTitle("Select Destination Folder");
         File folder = chooser.showDialog(null);
-
-        saveBtn.setDisable(false);
-        // enforce user to use save button
-        disableEncryptionAndDecryption();
-
-        if (folder != null) {
+        if (folder != null){
             destPathLabel.setText(folder.getAbsolutePath());
+            processManager.setDestFolder(folder.getAbsolutePath());
+            updateActionButtons(false, false, true);
         }
     }
 
     @FXML
     private void savePaths() {
-        String dest = destPathLabel.getText();
         String FileName = fileNameField.getText();
-
         try {
-            processManager.setDestFolder(dest, FileName);
-
-            encryptBtn.setDisable(false);
-            decryptBtn.setDisable(false);
-
+            processManager.setFileName(FileName);
+            processManager.validateAllDataExist();
+            if (processManager.getFileExtension().equals(UIConstants.EncruptedFileExt))
+                updateActionButtons(true, false, false);
+            else
+                updateActionButtons(false, true, false);
         } catch (IllegalArgumentException e) {
             showAlert(Alert.AlertType.WARNING, "Validation Issue", e.getMessage());
         } catch (Exception e) {
             showAlert(Alert.AlertType.ERROR, "System Error", "An unexpected error occurred: " + e.getMessage());
         }
     }
-
 
     @FXML
     private void encryptFile() {
@@ -110,14 +89,6 @@ public class MainController {
     @FXML
     private void decryptFile() {
         runTask(processManager::executeDecryption, "Decryption");
-    }
-
-    private void showAlert(Alert.AlertType type, String title, String content) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null); // Keeps the dialog simple
-        alert.setContentText(content);
-        alert.showAndWait();
     }
 
     private void runTask(Runnable logic, String actionName) {
@@ -131,39 +102,44 @@ public class MainController {
 
         task.setOnSucceeded(e -> {
             clearInputs();
-            saveBtn.setDisable(false);
             showAlert(Alert.AlertType.INFORMATION, "Process Complete", actionName + " successful!");
         });
 
         task.setOnFailed(e -> {
             clearInputs();
-            saveBtn.setDisable(false);
-            Throwable ex = task.getException();
-            showAlert(Alert.AlertType.ERROR, actionName + " Error", "An error occurred: " + ex.getMessage());
+            showAlert(Alert.AlertType.ERROR, actionName + " Error", "An error occurred: " + task.getException().getMessage());
         });
 
-        saveBtn.setDisable(true);
-        encryptBtn.setDisable(true);
-        decryptBtn.setDisable(true);
-
+        updateActionButtons(false, false, false);
         executor.submit(task);
     }
 
-    public void shutdown() {
-        executor.shutdownNow();
+    private void showAlert(Alert.AlertType type, String title, String content) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null); // Keeps the dialog simple
+        alert.setContentText(content);
+        alert.showAndWait();
     }
 
     private void clearInputs() {
         sourcePathLabel.setText("");
         destPathLabel.setText("");
         fileNameField.setText("");
-        fileSizeLabel.setText("File Size: ");
-        fileExtLabel.setText("Extension: ");
+        fileSizeLabel.setText(UIConstants.DEFAULT_SIZE_LABEL);
+        fileExtLabel.setText(UIConstants.DEFAULT_TEXT_LABEL);
     }
 
-    private void disableEncryptionAndDecryption() {
-        encryptBtn.setDisable(true);
-        decryptBtn.setDisable(true);
+    private void updateActionButtons(boolean decrypt, boolean encrypt, boolean save) {
+        decryptBtn.setDisable(!decrypt); // using ! to make true open the button
+        encryptBtn.setDisable(!encrypt);
+        saveBtn.setDisable(!save);
     }
 
+
+    public void shutdownExecutor() {
+        System.out.println("Shutting down ExecutorService...");
+        executor.shutdownNow();
+        System.out.println("ExecutorService terminated: " + executor.isShutdown());
+    }
 }

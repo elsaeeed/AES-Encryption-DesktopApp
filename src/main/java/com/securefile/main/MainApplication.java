@@ -16,18 +16,18 @@ public class MainApplication extends Application {
         Scene scene = new Scene(fxmlLoader.load());
         stage.setTitle("AES Encryption APP");
         stage.setScene(scene);
-
         stage.setResizable(false);
 
-        Image icon = new Image(getClass().getResourceAsStream("/softlock_logo.jpg"));
+        Image icon = new Image(getClass().getResourceAsStream("/aesLogo.jpg"));
         stage.getIcons().add(icon);
 
         // shutdown executor on application close
         MainController controller = fxmlLoader.getController();
         stage.setOnCloseRequest(event -> {
-            controller.shutdown();
+            controller.shutdownExecutor();
         });
 
         stage.show();
     }
+
 }
